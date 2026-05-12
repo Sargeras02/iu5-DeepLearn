@@ -14,7 +14,7 @@ const DOM = {
   labelsField: "labels",
   undoBtn: "undo",
   addBtn: "add",
-  generateRandom: "random",
+  generateRandomBtn: "random",
   resetBtn: "reset",
   nField: "N",
   predictedLabel: "prediction",
@@ -171,8 +171,7 @@ const drawHist = (preds) => {
 find(DOM.modelFile).onchange = async function (event) {
   var fileList = this.files;
   if (!fileList.length) {
-    find(DOM.imageFile).style.display = "none";
-    find(DOM.imageFile).value = "";
+    find(DOM.imageFile).style.display = "none"; // Скрыть файл изображения
     find(DOM.cifarImage).parentElement.style.display = "none";
     find(DOM.controlsGroup).style.display = "none";
     find(DOM.resetBtn).click();
@@ -182,18 +181,22 @@ find(DOM.modelFile).onchange = async function (event) {
   let file = fileList[0];
   let reader = new FileReader();
   reader.onloadend = async function () {
-    onnxSess = new onnx.InferenceSession();
-    await onnxSess.loadModel(reader.result);
-    const img = new Float32Array(32 * 32 * 3);
-    img.fill(1);
-    const input = new onnx.Tensor(img, "float32", [1, 32, 32, 3]);
-    const output = (await onnxSess.run([input])).get("output").data;
-    find(DOM.imageFile).style.display = "block";
-    find(DOM.headerText).textContent = INSTRUCTION.step2;
+    try {
+      onnxSess = await ort.InferenceSession.create(reader.result);
+      const img = new Float32Array(32 * 32 * 3);
+      img.fill(1);
+      const input = new ort.Tensor("float32", img, [1, 32, 32, 3]);
+      const output = (await onnxSess.run({ input: input })).output;
+      find(DOM.imageFile).style.display = "block"; // Скрыть файл модели
+      find(DOM.headerText).textContent = INSTRUCTION.step2;
+    } catch (error) {
+      console.error('Ошибка при загрузке модели:', error);
+      alert('Произошла ошибка при загрузке модели. Убедитесь, что файл модели корректен и содержит все необходимые данные.');
+    }
   };
-  reader.readAsDataURL(file);
-  console.log(fileList[0]);
+  reader.readAsArrayBuffer(file);
 };
+
 
 const applySoftmax = (logits) => {
   const maxLogit = Math.max(...logits);
@@ -220,19 +223,32 @@ const recognizeImage = async () => {
   canvas.remove();
   console.log(img);
 
-  //const img = new Float32Array(32 * 32 * 3);
-  const input = new onnx.Tensor(img, "float32", [1, 32, 32, 3]);
-  const output = (await onnxSess.run([input])).get("output").data;
-  const output_slice = [...output];
-  console.log(output_slice);
-  if (output.length === 100) {
-    output_slice.length = classes.length;
+  const input = new ort.Tensor("float32", new Float32Array(img), [1, 32, 32, 3]);
+  const output = (await onnxSess.run({ input: input })).output;
+  const outputData = output.data;
+  console.log("Output shape:", output.dims, "Output length:", outputData.length);
+  
+  // Если модель возвращает 100 классов, выбираем только нужные
+  // Если 3 класса - используем все
+  let output_slice;
+  if (outputData.length === 100 && classes.length > 0) {
+    output_slice = [];
     for (let i = 0; i < classes.length; i++)
-      output_slice[i] = output[classes[i]];
+      output_slice[i] = outputData[classes[i]];
+  } else {
+    output_slice = [...outputData];
   }
-  find(DOM.predictedLabel).textContent = mapping[
-    classes[indexOfMax(output_slice)]
-  ].toUpperCase();
+  
+  console.log("Output slice:", output_slice);
+  
+  // Проверяем, что есть классы для предсказания
+  if (classes.length === 0) {
+    find(DOM.predictedLabel).textContent = "ВЫБЕРИТЕ КЛАССЫ";
+  } else {
+    const predictedIndex = indexOfMax(output_slice);
+    const classId = classes[predictedIndex];
+    find(DOM.predictedLabel).textContent = mapping[classId].toUpperCase();
+  }
   drawHist(applySoftmax(output_slice));
 };
 
@@ -264,6 +280,9 @@ find(DOM.imageFile).onchange = function (event) {
   imgVis.parentElement.style.display = "block";
   controlsGroup.style.display = "block";
   find(DOM.headerText).textContent = INSTRUCTION.step3;
+
+  // Скрываем input file после загрузки
+  find(DOM.imageFile).style.display = "none"; // Скрыть файл изображения
 };
 
 function indexOfMax(arr) {
@@ -284,10 +303,29 @@ function indexOfMax(arr) {
   return maxIndex;
 }
 
+find(DOM.generateRandomBtn).addEventListener("click", (e) => {
+  classesBackup.push([...classes]);
+  classes.length = 0;
+  for (let i = 0; (i < 100) & (classes.length < 10); i++) {
+    const label = Math.floor(Math.random() * 100);
+    appendLabelId(label, false);
+  }
+  find(DOM.nField).textContent = classes;
+  recognizeImage();
+});
+
 find(DOM.labelId).addEventListener("change", function () {
   let v = parseInt(this.value);
   if (v < 0) this.value = 0;
   if (v > 99) this.value = 99;
+});
+
+// Обработчик нажатия клавиши Enter для поля ввода labelId
+find(DOM.labelId).addEventListener("keydown", function (event) {
+  if (event.key === 'Enter') {
+    event.preventDefault(); // Отменяем стандартное поведение Enter
+    find(DOM.addBtn).click(); // Имитируем нажатие кнопки "Добавить"
+  }
 });
 
 const appendLabelId = (labelId, backup = true) => {
@@ -308,17 +346,6 @@ find(DOM.addBtn).addEventListener("click", (e) => {
   }
   const value = parseInt(labelId.value);
   appendLabelId(value);
-  find(DOM.nField).textContent = classes;
-  recognizeImage();
-});
-
-find(DOM.generateRandom).addEventListener("click", (e) => {
-  classesBackup.push([...classes]);
-  classes.length = 0;
-  for (let i = 0; (i < 100) & (classes.length < 10); i++) {
-    const label = Math.floor(Math.random() * 100);
-    appendLabelId(label, false);
-  }
   find(DOM.nField).textContent = classes;
   recognizeImage();
 });
