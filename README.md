@@ -39,9 +39,9 @@
 4. [Лабораторная работа №4](/notebooks/Lab4_(v2026).ipynb). Перенос обучения <a href="https://colab.research.google.com/github/iu5git/Deep-learning/blob/main/notebooks/Lab4_(v2026).ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
 5. [Лабораторная работа №5](/notebooks/Lab5.ipynb). Автоэнкодеры
-6. [Лабораторная работа №6](/notebooks/tree_classification.ipynb). Классификация LiDAR
-7. [Лабораторная работа №7](/notebooks/Forest_sat.ipynb). Спутниковые снимки
-8. [Лабораторная работа №8](/notebooks/LSTM.ipynb). Рекуррентные нейросети
+6. [Лабораторная работа №6](/notebooks/Lab6_Tree_classification.ipynb). Классификация LiDAR
+7. [Лабораторная работа №7](/notebooks/Lab7_Forest_sat.ipynb). Спутниковые снимки
+8. [Лабораторная работа №8](/notebooks/Lab8_LSTM.ipynb). Рекуррентные нейросети
 
 
 ## Домашнее задание
